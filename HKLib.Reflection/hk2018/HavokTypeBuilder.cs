@@ -667,10 +667,10 @@ public class HavokTypeBuilder
         /// <exception cref="InvalidOperationException">The value has already been set</exception>
         public void SetValue(HavokType type)
         {
-            if (_value is not null)
-            {
-                throw new InvalidOperationException("Reference value has already been set.");
-            }
+            //if (_value is not null)
+            //{
+            //    throw new InvalidOperationException("Reference value has already been set.");
+            //}
 
             _value = type;
         }

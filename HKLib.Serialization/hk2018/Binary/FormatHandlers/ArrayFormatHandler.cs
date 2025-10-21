@@ -108,7 +108,9 @@ internal abstract class ArrayFormatHandler
     private static object ReadHkPropertyBag(HavokBinaryReader reader, HavokType type, BinaryDeserializeContext context)
     {
         // only field is non-serialized
-        reader.AssertUInt64(0);
+        // TODO
+        //reader.AssertUInt64(0);
+        reader.AssertUInt32(0);
         return type.Instantiate();
     }
 
@@ -339,9 +341,13 @@ internal class ArrayFormatHandler<T> : ArrayFormatHandler
     {
         List<T> list = new();
 
-        ulong pointer = reader.ReadUInt64();
+        //ulong pointer = reader.ReadUInt64();
+        //// sizeAndFlags
+        //reader.AssertUInt64(0);
+
+        ulong pointer = reader.ReadUInt32();
         // sizeAndFlags
-        reader.AssertUInt64(0);
+        //reader.AssertUInt32(0);
 
         if (pointer != 0)
         {
@@ -350,6 +356,26 @@ internal class ArrayFormatHandler<T> : ArrayFormatHandler
 
         return list;
     }
+
+    //private static object ReadHkArray(HavokBinaryReader reader, HavokType type, BinaryDeserializeContext context)
+    //{
+    //    List<T> list = new();
+
+    //    ulong pointer = reader.ReadUInt64();
+    //    ulong sizeAndFlags = reader.ReadUInt64();
+    //    int size = (int)(sizeAndFlags & 0xFFFFFFFF);
+    //    int capFlags = (int)(sizeAndFlags >> 32);
+
+    //    if (pointer != 0)
+    //    {
+    //        PopulateListFromPointer(reader, list, pointer, context);
+    //        // Optional sanity check
+    //        if (size != list.Count)
+    //            throw new InvalidDataException($"hkArray size mismatch. Header={size}, Items={list.Count}, Pos=0x{reader.Position:X}");
+    //    }
+
+    //    return list;
+    //}
 
     private static void WriteHkArray(HavokBinaryWriter writer, HavokType type, object? value,
         BinarySerializeContext context)
@@ -375,6 +401,24 @@ internal class ArrayFormatHandler<T> : ArrayFormatHandler
         writer.WriteUInt64(pointer);
         writer.WriteUInt64(0);
     }
+
+    //private static void WriteHkArray(HavokBinaryWriter writer, HavokType type, object? value, BinarySerializeContext context)
+    //{
+    //    if (value is not List<T> list || list.Count == 0)
+    //    {
+    //        writer.WriteUInt64(0);
+    //        writer.WriteUInt64(0);
+    //        return;
+    //    }
+
+    //    ulong pointer = EnqueueList(writer, type, context, list);
+    //    writer.WriteUInt64(pointer);
+
+    //    // Pick appropriate flags for your target (often 3 for non-owned). Avoid hardcoding without confirmation.
+    //    int capFlags = 3; // TODO: confirm with your target packfile/platform
+    //    ulong sizeAndFlags = ((ulong)capFlags << 32) | (uint)list.Count;
+    //    writer.WriteUInt64(sizeAndFlags);
+    //}
 
     private static ulong EnqueueList(HavokBinaryWriter writer, HavokType type, BinarySerializeContext context,
         List<T> list)

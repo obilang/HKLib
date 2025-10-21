@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\HKLib.CLI\HKLib.CLI.csproj" />
+    <ProjectReference Include="..\HKLib.Reflection\HKLib.Reflection.csproj" />
+    <ProjectReference Include="..\HKLib.Serialization\HKLib.Serialization.csproj" />
+    <ProjectReference Include="..\HKLib\HKLib.csproj" />
+  </ItemGroup>
+
+</Project>
