@@ -8,6 +8,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="FbxSharp" Version="0.9.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Workspace\FF16\IONET-202205192df6800e5451f8ad5e6e327785077266\IONET\IONET.csproj" />
     <ProjectReference Include="..\HKLib.CLI\HKLib.CLI.csproj" />
     <ProjectReference Include="..\HKLib.Reflection\HKLib.Reflection.csproj" />
     <ProjectReference Include="..\HKLib.Serialization\HKLib.Serialization.csproj" />

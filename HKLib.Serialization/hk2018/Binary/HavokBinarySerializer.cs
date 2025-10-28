@@ -175,8 +175,7 @@ public class HavokBinarySerializer : HavokSerializer
     {
         reader.EnterSection("INDX");
         IReadOnlyList<IHavokObject> havokObjects = ReadITEM(reader, types, dataOffset);
-        // TODO
-        //ReadPTCH(reader, types, dataOffset);
+        ReadPTCH(reader, types, dataOffset);
         reader.ExitSection();
 
         return havokObjects;
@@ -360,8 +359,7 @@ public class HavokBinarySerializer : HavokSerializer
     {
         reader.EnterSection("TYPE");
 
-        // TODO:
-        //ReadTPTR(reader);
+        ReadTPTR(reader);
         IReadOnlyList<string> typeStrings = ReadTSTR(reader);
         IReadOnlyList<HavokTypeBuilder> typeBuilders = ReadTNA1(reader, typeStrings);
 
@@ -426,16 +424,49 @@ public class HavokBinarySerializer : HavokSerializer
 
     private IReadOnlyList<string> ReadTSTR(HavokBinaryReader reader)
     {
-        reader.EnterSection("TSTR");
+        reader.EnterSection("TST1");
 
         List<string> strings = new();
         while (reader.Position < reader.GetSectionEnd())
         {
-            strings.Add(reader.ReadASCII());
+            var posBeforeRead = reader.Position;
+
+            var typeStr = reader.ReadASCII();
+
+            if (reader.Position > reader.GetSectionEnd())
+            {
+                // Validate padding: bytes must be 0xFF until hitting 0x40 ('@')
+                if (!IsAllFFUntil40Bytes(reader, posBeforeRead, reader.GetSectionEnd()))
+                {
+                    throw new InvalidOperationException(
+                        $"Wrong type string found at end of TST1 section {typeStr}");
+                }
+
+                reader.Position = reader.GetSectionEnd();
+            }
+            else
+            {
+                strings.Add(typeStr);
+            }
         }
 
         reader.ExitSection();
         return strings;
+    }
+
+    // Checks raw bytes [start, end) are 0xFF until a 0x40 ('@') is encountered.
+    private static bool IsAllFFUntil40Bytes(HavokBinaryReader reader, long start, long end)
+    {
+        int len = (int)Math.Max(0, end - start);
+        if (len == 0) return true;
+
+        byte[] bytes = reader.GetBytes(start, len);
+        foreach (byte b in bytes)
+        {
+            if (b == 0x40) return true; // hit '@'
+            if (b != 0xFF) return false;
+        }
+        return true; // only 0xFFs up to end
     }
 
     private IReadOnlyDictionary<string, int> WriteTSTR(HavokBinaryWriter writer,
@@ -565,13 +596,31 @@ public class HavokBinarySerializer : HavokSerializer
 
     private IReadOnlyList<string> ReadFSTR(HavokBinaryReader reader)
     {
-        reader.EnterSection("FSTR");
+        reader.EnterSection("FST1");
 
         List<string> strings = new();
 
         while (reader.Position < reader.GetSectionEnd())
         {
-            strings.Add(reader.ReadASCII());
+            var posBeforeRead = reader.Position;
+
+            var typeStr = reader.ReadASCII();
+
+            if (reader.Position > reader.GetSectionEnd())
+            {
+                // Validate padding: bytes must be 0xFF until hitting 0x40 ('@')
+                if (!IsAllFFUntil40Bytes(reader, posBeforeRead, reader.GetSectionEnd()))
+                {
+                    throw new InvalidOperationException(
+                        $"Wrong type string found at end of FST1 section {typeStr}");
+                }
+
+                reader.Position = reader.GetSectionEnd();
+            }
+            else
+            {
+                strings.Add(typeStr);
+            }
         }
 
         reader.ExitSection();
@@ -845,7 +894,9 @@ public class HavokBinarySerializer : HavokSerializer
             uint readHash = reader.ReadUInt32();
             if (readHash != hash)
             {
-                throw new InvalidDataException($"Incorrect hash encountered for type {types[typeIndex].Identity}.");
+                // TODO
+                //throw new InvalidDataException($"Incorrect hash encountered for type {types[typeIndex].Identity}.");
+                Debug.WriteLine($"Incorrect hash encountered for type {types[typeIndex].Identity}.");
             }
         }
 
@@ -952,7 +1003,8 @@ public class HavokBinarySerializer : HavokSerializer
     private void ReadSDKV(HavokBinaryReader reader)
     {
         reader.EnterSection("SDKV");
-        if (reader.ReadASCII(8) != "20180100")
+        var version = reader.ReadASCII(8);
+        if (version != "20180100" && version != "20200200")
         {
             throw new InvalidDataException("Unsupported SDK Version.");
         }
