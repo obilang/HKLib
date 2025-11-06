@@ -230,28 +230,95 @@ public static class PredictiveBlockCompression
     #endregion
 
     #region Decoding
+    public static short[][] DecodeAllFrameChannel(byte[] data)
+    {
+        // Temp array for testing. (formal data is stored in hkaanimation intarray
+        uint[] frameDivideOffset = { 0, 2563, 5034, 7792, 10802, 13819, 15301};
+
+        // temp: number of channels is from the animation data
+        uint totalChannelCount = 172;
+        short[][] channelFrameVal = new short[totalChannelCount][];
+        // temp: number of frames is from the animation data
+        uint totalFrameCount = 85;
+        uint fetchedFrameCount = 0;
+
+        for (int frameDivideIdx = 0; frameDivideIdx < frameDivideOffset.Length - 1; frameDivideIdx++)
+        {
+            uint frameDataOffset = frameDivideOffset[frameDivideIdx];
+
+            uint endPos = 0;
+
+            uint fetchedChannelCount = 0;
+
+            //while (endPos < frameDivideOffset[frameDivideIdx + 1])
+            while (fetchedChannelCount < totalChannelCount)
+            {
+                uint channelCount = Math.Min(BLOCK_CHANNELS, totalChannelCount - fetchedChannelCount);
+                uint frameCount = Math.Min(BLOCK_FRAMES, totalFrameCount - fetchedFrameCount);
+
+                if (channelCount < BLOCK_CHANNELS)
+                {
+                    //for debug
+                    int test = 1;
+                }
+
+                if (frameCount < BLOCK_FRAMES)
+                {
+                    //for debug
+                    int test = 1;
+                }
+
+                Block block = DecodeWholeBlock(data, channelCount, frameCount, out endPos, frameDataOffset);
+                frameDataOffset = endPos;
+
+                for (int i = 0; i < channelCount; i++)
+                {
+                    if (channelFrameVal[fetchedChannelCount + i] == null)
+                    {
+                    
+                        channelFrameVal[fetchedChannelCount + i] = new short[totalFrameCount];
+                    }
+                    Array.Copy(block.Data[i], 0,
+                        channelFrameVal[fetchedChannelCount + i],
+                        frameDivideIdx * 16,
+                        frameCount);
+                }
+
+                fetchedChannelCount = fetchedChannelCount + channelCount;
+            }
+
+            if (endPos != frameDataOffset)
+            {
+                // for debug
+                int test = 1;
+            }
+
+            fetchedFrameCount += BLOCK_FRAMES;
+        }
+        return channelFrameVal;
+    }
 
     /// <summary>
     /// Decode a compressed block
     /// </summary>
     /// <param name="data">Compressed data</param>
     /// <returns>Decoded block (16×16 samples)</returns>
-    public static Block DecodeWholeBlock(byte[] data)
+    public static Block DecodeWholeBlock(byte[] data, uint channelNum, uint frameNum, out uint endPos, uint startOffset = 0)
     {
         if (data == null) throw new ArgumentNullException(nameof(data));
         if (data.Length < BLOCK_CHANNELS + 2 * BLOCK_CHANNELS)
             throw new ArgumentException("Data too short for valid block");
 
         var block = new Block();
-        int dataPos = 0;
+        int dataPos = (int)startOffset;
 
         // Read header (16 size bytes)
         var sizeBytes = new byte[BLOCK_CHANNELS];
-        Array.Copy(data, sizeBytes, BLOCK_CHANNELS);
+        Array.Copy(data, (int)startOffset, sizeBytes, 0, BLOCK_CHANNELS);
         dataPos += BLOCK_CHANNELS;
 
         // Decode each channel
-        for (int ch = 0; ch < BLOCK_CHANNELS; ch++)
+        for (int ch = 0; ch < channelNum; ch++)
         {
             int len0 = ((sizeBytes[ch] >> 4) & 0xF) + 1;
             int len1 = (sizeBytes[ch] & 0xF) + 1;
@@ -265,50 +332,14 @@ public static class PredictiveBlockCompression
             dataPos += len1;
 
             // Apply delta decoding
-            DeltaDecode(block.Data[ch]);
+            DeltaDecode(block.Data[ch], (int)frameNum);
         }
+
+        endPos = (uint)dataPos;
 
         return block;
     }
 
-    /// <summary>
-    /// Decode a single frame from compressed block
-    /// </summary>
-    /// <param name="data">Compressed data</param>
-    /// <param name="whichFrame">Frame index (0-15)</param>
-    /// <returns>16 channel values for the specified frame</returns>
-    public static short[] DecodeSingleFrame(byte[] data, int whichFrame)
-    {
-        if (whichFrame < 0 || whichFrame >= BLOCK_FRAMES)
-            throw new ArgumentOutOfRangeException(nameof(whichFrame));
-
-        var result = new short[BLOCK_CHANNELS];
-        int dataPos = 0;
-
-        var sizeBytes = new byte[BLOCK_CHANNELS];
-        Array.Copy(data, sizeBytes, BLOCK_CHANNELS);
-        dataPos += BLOCK_CHANNELS;
-
-        var channelData = new short[BLOCK_FRAMES];
-
-        for (int ch = 0; ch < BLOCK_CHANNELS; ch++)
-        {
-            int len0 = ((sizeBytes[ch] >> 4) & 0xF) + 1;
-            int len1 = (sizeBytes[ch] & 0xF) + 1;
-
-            DecodeSegment(data, dataPos + len0, channelData, 0);
-            dataPos += len0;
-
-            DecodeSegment(data, dataPos + len1, channelData, 8);
-            dataPos += len1;
-
-            DeltaDecode(channelData);
-
-            result[ch] = channelData[whichFrame];
-        }
-
-        return result;
-    }
 
     private static void DecodeSegment(byte[] coded, int codedEnd, short[] decoded, int decodedOffset)
     {
@@ -375,13 +406,13 @@ public static class PredictiveBlockCompression
         return (value << shift) >> shift;
     }
 
-    private static void DeltaDecode(short[] data)
+    private static void DeltaDecode(short[] data, int frameCount)
     {
         // Apply cumulative sum DELTA_CODE_ORDER times
         for (int order = 0; order < DELTA_CODE_ORDER; order++)
         {
             short sum = 0;
-            for (int i = 0; i < BLOCK_FRAMES; i++)
+            for (int i = 0; i < frameCount; i++) // Use frameCount instead of BLOCK_FRAMES
             {
                 sum = (short)(sum + data[i]);
                 data[i] = sum;
@@ -389,7 +420,7 @@ public static class PredictiveBlockCompression
         }
 
         // Shift right by 2
-        for (int i = 0; i < BLOCK_FRAMES; i++)
+        for (int i = 0; i < frameCount; i++) // Use frameCount instead of BLOCK_FRAMES
         {
             data[i] = (short)(data[i] >> 2);
         }
