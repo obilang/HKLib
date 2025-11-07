@@ -18,7 +18,8 @@ namespace ColladaTest
         static void Main(string[] args)
         {
             //string hkxPath = @"E:\Git\HavokConvertExperiment\temp\auto_attack1_2018_tag_back.hkt";
-            string hkxPath = @"E:\Git\HavokConvertExperiment\temp\a_dmg_wind.hkx";
+            //string hkxPath = @"E:\Git\HavokConvertExperiment\temp\a_dmg_wind.hkx";
+            string hkxPath = @"E:\Workspace\FF16\Output\animation\env\bgparts\common\treasure\g01\animation\b0_trea_g01\treasure_0_ab.anmb";
             string? compendiumPath = null; // Set if your hkx references one: @"C:\path\to\types.compendium"
 
             var serializer = new HavokBinarySerializer();
@@ -30,10 +31,10 @@ namespace ColladaTest
             IEnumerable<IHavokObject> havokObjects = serializer.ReadAllObjects(hkxPath);
             var animations = havokObjects.OfType<hkaPredictiveCompressedAnimation>().ToList();
             var animation = animations.FirstOrDefault(); // null if none found
-            float[] offsetArray = new float[172];
-            Array.Copy(animation.m_floatData.ToArray(), 338, offsetArray, 0, 172);
-            float[] scaleArray = new float[172];
-            Array.Copy(animation.m_floatData.ToArray(), 510, scaleArray, 0, 172);
+            //float[] offsetArray = new float[172];
+            //Array.Copy(animation.m_floatData.ToArray(), 338, offsetArray, 0, 172);
+            //float[] scaleArray = new float[172];
+            //Array.Copy(animation.m_floatData.ToArray(), 510, scaleArray, 0, 172);
 
 
 
@@ -65,8 +66,28 @@ namespace ColladaTest
                 for (int fr = 0; fr < 16; fr++)
                     block.Data[ch][fr] = 0;
 
+
+            var block2 = new PredictiveBlockCompression.Block();
+            // Channel 0: Linear increase
+            for (int i = 15; i < 15 + 16; i++)
+                block2.Data[0][i - 15] = (short)(1000 + i * 2);
+
+            // Channel 1: Constant
+            for (int i = 15; i < 15 + 16; i++)
+                block2.Data[1][i - 15] = 500;
+
+            // Channel 2: Quadratic
+            for (int i = 15; i < 15 + 16; i++)
+                block2.Data[2][i - 15] = (short)(i * i);
+
+            // Channels 3-15: Zeros
+            for (int ch = 3; ch < 16; ch++)
+                for (int fr = 0; fr < 16; fr++)
+                    block2.Data[ch][fr] = 0;
+
             // Encode
             //byte[] compressed = PredictiveBlockCompression.EncodeBlock(block, 16, 16);
+            //byte[] compressed2 = PredictiveBlockCompression.EncodeBlock(block2, 4, 16);
             byte[] compressed = animation.m_compressedData.ToArray();
             Console.WriteLine($"Original: 512 bytes");
             Console.WriteLine($"Compressed: {compressed.Length} bytes");
@@ -75,40 +96,24 @@ namespace ColladaTest
             // Decode
             var decoded = PredictiveBlockCompression.DecodeAllFrameChannel(compressed);
 
-            float[][] result = new float[decoded.Length][];
+            //float[][] result = new float[decoded.Length][];
 
-            for (int i = 0; i < decoded.Length; i++)
-            {
-                for (int j = 0; j < decoded[0].Length; j++)
-                {
-                    result[i] ??= new float[decoded[0].Length];
-
-                    result[i][j] = ((float)decoded[i][j]) * scaleArray[i] + offsetArray[i];
-                }
-            }
-
-            //// Verify
-            //bool success = true;
-            //for (int ch = 0; ch < 16; ch++)
+            //for (int i = 0; i < decoded.Length; i++)
             //{
-            //    for (int fr = 0; fr < 16; fr++)
+            //    for (int j = 0; j < decoded[0].Length; j++)
             //    {
-            //        if (block.Data[ch][fr] != decoded.Data[ch][fr])
-            //        {
-            //            Console.WriteLine($"Mismatch at [{ch}][{fr}]: " +
-            //                $"{block.Data[ch][fr]} != {decoded.Data[ch][fr]}");
-            //            success = false;
-            //        }
+            //        result[i] ??= new float[decoded[0].Length];
+
+            //        result[i][j] = ((float)decoded[i][j]) * scaleArray[i] + offsetArray[i];
             //    }
             //}
 
-            //Console.WriteLine(success ? "✓ Lossless compression verified!" : "✗ Decompression error");
 
-            //// Test single frame decoding
-            //var frame7 = PredictiveBlockCompression.DecodeSingleFrame(compressed, 7);
-            //Console.WriteLine($"\nFrame 7 values:");
-            //for (int ch = 0; ch < 3; ch++)
-            //    Console.WriteLine($"  Channel {ch}: {frame7[ch]}");
+            //uint endPos;
+            //var decoded = PredictiveBlockCompression.DecodeWholeBlock(compressed, 16,16, out endPos);
+            //var decoded2 = PredictiveBlockCompression.DecodeWholeBlock(compressed2, 16, 4, out endPos);
+
+
 
 
 
