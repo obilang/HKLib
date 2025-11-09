@@ -304,19 +304,9 @@ public static class PredictiveBlockCompression
     //    return channelFrameVal;
     //}
 
-    public static short[][] DecodeAllFrameChannel(byte[] data)
+    public static short[][] DecodeAllFrameChannel(byte[] data, ushort[] blockOffsets, int totalChannelCount, int totalFrameCount)
     {
-        // Temp array for testing. (formal data is stored in hkaanimation intarray
-        //uint[] frameDivideOffset = { 0, 2563, 5034, 7792, 10802, 13819, 15301 };
-        uint[] frameDivideOffset = { 0, 103,190 };
-
-        // temp: number of channels is from the animation data
-        //uint totalChannelCount = 172;
-        uint totalChannelCount = 3;
         short[][] channelFrameVal = new short[totalChannelCount][];
-        // temp: number of frames is from the animation data
-        //uint totalFrameCount = 79;
-        uint totalFrameCount = 30;
 
         // Initialize all channel arrays
         for (int i = 0; i < totalChannelCount; i++)
@@ -324,21 +314,33 @@ public static class PredictiveBlockCompression
             channelFrameVal[i] = new short[totalFrameCount];
         }
 
-        uint outputFrameOffset = 0; // Where we write in the output
-
-        for (int frameDivideIdx = 0; frameDivideIdx < frameDivideOffset.Length - 1; frameDivideIdx++)
+        int[] blockOffsetsVal = new int[blockOffsets.Length / 2 + 1];
+        // start from 0
+        blockOffsetsVal[0] = 0;
+        for (int i = 0; i < blockOffsets.Length / 2; ++i)
         {
-            uint frameDataOffset = frameDivideOffset[frameDivideIdx];
-            uint endPos = 0;
-            uint fetchedChannelCount = 0;
+            ushort low = blockOffsets[i * 2];
+            ushort high = blockOffsets[i * 2 + 1];
+
+            blockOffsetsVal[i + 1] = (high << 16) | low;
+        }
+
+        int outputFrameOffset = 0; // Where we write in the output
+
+        for (int frameDivideIdx = 0; frameDivideIdx < blockOffsetsVal.Length - 1; frameDivideIdx++)
+        {
+            int frameDataOffset = (int)blockOffsetsVal[frameDivideIdx];
+            int endPos = 0;
+            int fetchedChannelCount = 0;
 
             // Calculate the actual frame range this block contains in the compressed data
+            // TODO: the decompressed value not same at overlapping frames, need to verify
             // Block 0: frames 0-15 (starting at compressed frame 0)
             // Block 1: frames 15-30 (starting at compressed frame 15, overlaps at 15)
             // Block 2: frames 30-45 (starting at compressed frame 30, overlaps at 30)
-            uint compressedFrameStart = (uint)(frameDivideIdx * (BLOCK_FRAMES - 1));
-            uint remainingFrames = totalFrameCount - compressedFrameStart;
-            uint frameCount = Math.Min(BLOCK_FRAMES, remainingFrames);
+            int compressedFrameStart = frameDivideIdx * (BLOCK_FRAMES - 1);
+            int remainingFrames = totalFrameCount - compressedFrameStart;
+            int frameCount = Math.Min(BLOCK_FRAMES, remainingFrames);
 
             Console.WriteLine($"Block {frameDivideIdx}: compressedFrameStart={compressedFrameStart}, " +
                              $"frameCount={frameCount}, outputFrameOffset={outputFrameOffset}");
@@ -346,7 +348,7 @@ public static class PredictiveBlockCompression
             // Process all channels for this frame block
             while (fetchedChannelCount < totalChannelCount)
             {
-                uint channelCount = Math.Min(BLOCK_CHANNELS, totalChannelCount - fetchedChannelCount);
+                int channelCount = (int)Math.Min(BLOCK_CHANNELS, totalChannelCount - fetchedChannelCount);
 
                 Block block = DecodeWholeBlock(data, channelCount, frameCount, out endPos, frameDataOffset);
 
@@ -357,13 +359,13 @@ public static class PredictiveBlockCompression
                 {
                     // Skip the first frame if this is not the first block (it's the overlapping frame)
                     int sourceOffset = (frameDivideIdx > 0) ? 1 : 0;
-                    int framesToCopy = (int)frameCount - sourceOffset;
+                    int framesToCopy = frameCount - sourceOffset;
 
                     if (framesToCopy > 0)
                     {
                         Array.Copy(block.Data[i], sourceOffset,
                             channelFrameVal[fetchedChannelCount + i],
-                            (int)outputFrameOffset,
+                            outputFrameOffset,
                             framesToCopy);
                     }
                 }
@@ -374,7 +376,7 @@ public static class PredictiveBlockCompression
             // Update output offset: first block adds 16 frames, subsequent blocks add 15
             outputFrameOffset += (frameDivideIdx == 0) ? frameCount : (frameCount - 1);
 
-            if (endPos != frameDivideOffset[frameDivideIdx+1])
+            if (endPos != blockOffsetsVal[frameDivideIdx+1])
             {
                 // for debug
                 int test = 1;
@@ -389,7 +391,7 @@ public static class PredictiveBlockCompression
     /// </summary>
     /// <param name="data">Compressed data</param>
     /// <returns>Decoded block (16×16 samples)</returns>
-    public static Block DecodeWholeBlock(byte[] data, uint channelNum, uint frameNum, out uint endPos, uint startOffset = 0)
+    public static Block DecodeWholeBlock(byte[] data, int channelNum, int frameNum, out int endPos, int startOffset = 0)
     {
         if (data == null) throw new ArgumentNullException(nameof(data));
         if (data.Length < BLOCK_CHANNELS + 2 * BLOCK_CHANNELS)
@@ -418,10 +420,10 @@ public static class PredictiveBlockCompression
             dataPos += len1;
 
             // Apply delta decoding
-            DeltaDecode(block.Data[ch], (int)frameNum);
+            DeltaDecode(block.Data[ch], frameNum);
         }
 
-        endPos = (uint)dataPos;
+        endPos = dataPos;
 
         return block;
     }
@@ -432,17 +434,8 @@ public static class PredictiveBlockCompression
         // Load 16 bytes (may read before segment start, but within header buffer)
         ulong high = 0, low = 0;
 
-        // Read big-endian 128-bit value
-        if (codedEnd >= 16)
-        {
-            high = ReadBigEndianUInt64(coded, codedEnd - 16);
-            low = ReadBigEndianUInt64(coded, codedEnd - 8);
-        }
-        else
-        {
-            // Partial read for short segments
-            low = ReadBigEndianUInt64(coded, Math.Max(0, codedEnd - 8));
-        }
+        high = ReadBigEndianUInt64(coded, codedEnd - 16);
+        low = ReadBigEndianUInt64(coded, codedEnd - 8);
 
         int idx = decodedOffset;
 
