@@ -19,7 +19,7 @@ namespace ColladaTest
         static void Main(string[] args)
         {
             //string hkxPath = @"E:\Git\HavokConvertExperiment\temp\auto_attack1_2018_tag_back.hkt";
-            string skeleton_hkxPath = @"D:\Workspace\FF16\HavokConvertExperiment\temp\body.skl";
+            string skeleton_hkxPath = @"E:\Git\HavokConvertExperiment\temp\body.skl";
             string? compendiumPath = null; // Set if your hkx references one: @"C:\path\to\types.compendium"
 
             var serializer = new HavokBinarySerializer();
@@ -36,7 +36,7 @@ namespace ColladaTest
 
 
             // Animation
-            string animation_hkxPath = @"D:\GameDev\Resource\FFXVIOut\animation\chara\c1001\animation\a0001\common\normal\jog_f_lp.anmb";
+            string animation_hkxPath = @"E:\Workspace\FF16\Output\animation\chara\c1001\animation\a0001\common\event_action\receive_01.anmb";
 
             var serializer2 = new HavokBinarySerializer();
 
@@ -61,7 +61,7 @@ namespace ColladaTest
                 BlenderMode = true   // improves DAE compatibility for Blender
             });
 
-            Console.WriteLine("Exported d:/temp/simple_skeletal.fbx");
+            Console.WriteLine("Exported d:/temp/simple_skeletal.dae");
         }
 
         private static IOScene BuildSimpleSkinnedScene(hkaSkeleton khaSkeleton, hkaAnimationBinding hkaAnimationBinding, Dictionary<int, List<hkQsTransform>> poseAtTime)
@@ -149,6 +149,9 @@ namespace ColladaTest
                 {
                     int frame = f;
                     hkQsTransform transform = poseFrames[f];
+
+                    transform.m_rotation = Quaternion.Normalize(transform.m_rotation);
+
                     var transform2 = khaSkeleton.m_referencePose[boneIndex]; // For test, use reference pose
                     var normalizedRotation = Quaternion.Normalize(khaSkeleton.m_referencePose[boneIndex].m_rotation);
                     transform2.m_rotation = new Quaternion

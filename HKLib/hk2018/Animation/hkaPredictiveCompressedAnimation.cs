@@ -380,12 +380,15 @@ public class hkaPredictiveCompressedAnimation : hkaAnimation
 
                     for (int f = 0; f < m_numFrames; f++)
                     {
-                        var boneFrame = allTracks[boneIndex][0];
+                        var boneFrame = allTracks[boneIndex][f];
                         setBoneChannelVal(ref boneFrame, channelIdx % 12, v);
+                        quaternionRecoverW(ref boneFrame.m_rotation);
                         allTracks[boneIndex][f] = boneFrame;
                     }
                 }
             }
+
+            //return allTracks;
 
             // Copy dynamic values
             int ndynamic = getArrayLength(IntArrayID.DYNAMIC_BONE_TRACK_INDEX);
@@ -434,11 +437,7 @@ public class hkaPredictiveCompressedAnimation : hkaAnimation
                         var boneFrame = allTracks[boneIndex][f];
                         
                         setBoneChannelVal(ref boneFrame, channelIdx % 12, dynamicValChannelFrame[i][f] * scale + offset);
-
-                        if (i == 1)
-                        {
-                            Console.WriteLine($"{boneFrame.m_translation.Y}");
-                        }
+                        quaternionRecoverW(ref boneFrame.m_rotation);
 
                         allTracks[boneIndex][f] = boneFrame;
                     }
@@ -446,30 +445,30 @@ public class hkaPredictiveCompressedAnimation : hkaAnimation
             }
 
 
-            // Recover and interpolate w components of quaternions
-            ReadOnlySpan<ushort> normQuaternions = getArray(IntArrayID.RENORM_QUATERNION_INDEX);
-            int nquats = getArrayLength(IntArrayID.RENORM_QUATERNION_INDEX);
-            if (nquats > 0)
-            {
-                for (int i = 0; i < nquats; i++)
-                {
-                    int channelIdx = normQuaternions[i];
-                    if (channelIdx >= numFloatsPerBone) break;
+            //// Recover and interpolate w components of quaternions
+            //ReadOnlySpan<ushort> normQuaternions = getArray(IntArrayID.RENORM_QUATERNION_INDEX);
+            //int nquats = getArrayLength(IntArrayID.RENORM_QUATERNION_INDEX);
+            //if (nquats > 0)
+            //{
+            //    for (int i = 0; i < nquats; i++)
+            //    {
+            //        int channelIdx = normQuaternions[i];
+            //        if (channelIdx >= numFloatsPerBone) break;
 
-                    // find ref bone index
-                    int boneIndex = channelIdx / 12;
-                    if (!allTracks.ContainsKey(boneIndex))
-                        continue;
+            //        // find ref bone index
+            //        int boneIndex = channelIdx / 12;
+            //        if (!allTracks.ContainsKey(boneIndex))
+            //            continue;
 
-                    for (int f = 0; f < m_numFrames; f++)
-                    {
-                        //TODO: somehow this operation has wrong result
-                        var boneFrame = allTracks[boneIndex][f];
-                        quaternionRecoverW(ref boneFrame.m_rotation);
-                        allTracks[boneIndex][f].m_rotation = Quaternion.Normalize(boneFrame.m_rotation);
-                    }
-                }
-            }
+            //        for (int f = 0; f < m_numFrames; f++)
+            //        {
+            //            //TODO: somehow this operation has wrong result
+            //            var boneFrame = allTracks[boneIndex][f];
+            //            quaternionRecoverW(ref boneFrame.m_rotation);
+            //            allTracks[boneIndex][f].m_rotation = Quaternion.Normalize(boneFrame.m_rotation);
+            //        }
+            //    }
+            //}
         }
 
         return allTracks;

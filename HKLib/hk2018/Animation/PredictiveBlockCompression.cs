@@ -458,8 +458,19 @@ public static class PredictiveBlockCompression
             // Shift by width*2 + 4 bits
             int shift = width * 2 + 4;
             low >>= shift;
-            low |= ((high & (ulong)BitMask(shift)) << (64 - shift));
-            high >>= shift;
+
+            // Handle the 128-bit shift correctly
+            if (shift < 64)
+            {
+                low |= (high << (64 - shift));
+                high >>= shift;
+            }
+            else
+            {
+                // If shift >= 64, low becomes entirely from high
+                low = high >> (shift - 64);
+                high = 0;
+            }
         }
     }
 
