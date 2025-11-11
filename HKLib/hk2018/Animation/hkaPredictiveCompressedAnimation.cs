@@ -128,12 +128,23 @@ public class hkaPredictiveCompressedAnimation : hkaAnimation
     }
 
 
-    private static void quaternionRecoverW(ref Quaternion v)
+    private static void quaternionRecoverW(ref Quaternion v, bool usingManhattan=true)
     {
-        // Euclidean approach: w = sqrt(1 - x^2 - y^2 - z^2)
-        float lengthSquared = v.X * v.X + v.Y * v.Y + v.Z * v.Z;
-        float wSquared = Math.Clamp(1.0f - lengthSquared, 0.0f, 1.0f);
-        float w = MathF.Sqrt(wSquared);
+        float w;
+        if (usingManhattan)
+        {
+            float sum = MathF.Abs(v.X) + MathF.Abs(v.Y) + MathF.Abs(v.Z);
+            w = 1f - sum;
+            if (w < 0f) w = 0f;
+            else if (w > 1f) w = 1f;
+        }
+        else
+        {
+            // Euclidean approach: w = sqrt(1 - x^2 - y^2 - z^2)
+            float lengthSquared = v.X * v.X + v.Y * v.Y + v.Z * v.Z;
+            float wSquared = Math.Clamp(1.0f - lengthSquared, 0.0f, 1.0f);
+            w = MathF.Sqrt(wSquared);
+        }
         v = new Quaternion(v.X, v.Y, v.Z, w);
     }
 

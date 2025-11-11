@@ -36,7 +36,7 @@ namespace ColladaTest
 
 
             // Animation
-            string animation_hkxPath = @"E:\Workspace\FF16\Output\animation\chara\c1001\animation\a0001\common\event_action\receive_01.anmb";
+            string animation_hkxPath = @"E:\Workspace\FF16\Output\animation\chara\c1001\animation\a0001\common\ramuh\judgement_atk01.anmb";
 
             var serializer2 = new HavokBinarySerializer();
 
@@ -57,7 +57,7 @@ namespace ColladaTest
             IOManager.ExportScene(scene, "d:/temp/simple_skeletal.dae", new ExportSettings
             {
                 ExportAnimations = true,
-                FrameRate = 24.0f,   // used to convert frames -> seconds in DAE
+                FrameRate = 30.0f,   // used to convert frames -> seconds in DAE
                 BlenderMode = true   // improves DAE compatibility for Blender
             });
 
