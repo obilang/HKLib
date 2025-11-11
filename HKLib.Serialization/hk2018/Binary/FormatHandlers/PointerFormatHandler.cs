@@ -7,9 +7,7 @@ internal static class PointerFormatHandler
 {
     public static object Read(HavokBinaryReader reader, HavokType type, BinaryDeserializeContext context)
     {
-        // TODO
         ulong pointer = reader.ReadUInt64();
-        //ulong pointer = reader.ReadUInt32();
         return pointer == 0 ? null! : context.GetItem(pointer, reader)[0];
     }
 

@@ -1004,7 +1004,7 @@ public class HavokBinarySerializer : HavokSerializer
     {
         reader.EnterSection("SDKV");
         var version = reader.ReadASCII(8);
-        if (version != "20180100" && version != "20200200")
+        if (version != "20200100" && version != "20200200")
         {
             throw new InvalidDataException("Unsupported SDK Version.");
         }
@@ -1015,7 +1015,7 @@ public class HavokBinarySerializer : HavokSerializer
     private void WriteSDKV(HavokBinaryWriter writer)
     {
         writer.BeginSection("SDKV");
-        writer.WriteASCII("20180100");
+        writer.WriteASCII("20200200");
         writer.EndSection();
     }
 
