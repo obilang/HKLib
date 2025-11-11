@@ -668,7 +668,7 @@ public class BinaryReaderEx
 
     /// <summary>
     /// Reads an array of eight-byte unsigned integers.
-    /// </summary>
+    /// </summary>u
     public ulong[] ReadUInt64s(int count, bool? bigEndian = null)
     {
         var result = new ulong[count];

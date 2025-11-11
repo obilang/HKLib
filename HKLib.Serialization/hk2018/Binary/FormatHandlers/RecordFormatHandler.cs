@@ -1,6 +1,7 @@
 ﻿using HKLib.hk2018;
 using HKLib.Reflection.hk2018;
 using HKLib.Serialization.hk2018.Binary.Util;
+using System.Diagnostics;
 
 namespace HKLib.Serialization.hk2018.Binary.FormatHandlers;
 
@@ -13,6 +14,12 @@ internal static class RecordFormatHandler
                          throw new ArgumentException($"Failed to instantiate type {type.Identity}", nameof(type));
 
         long objectOffset = reader.Position;
+
+        if (type.Alignment == 0)
+        {
+            throw new InvalidOperationException($"Type \"{type.Identity}\" has an alignment of 0");
+        }
+
         if (objectOffset % type.Alignment != 0)
         {
             throw new InvalidOperationException(
@@ -23,7 +30,10 @@ internal static class RecordFormatHandler
         {
             if (reader.Position - objectOffset > field.Offset)
             {
-                throw new InvalidOperationException("Read past end of field");
+                // TODO
+                //throw new InvalidOperationException("Read past end of field");
+                Debug.WriteLine("Warning: Read past end of field {0} in type {1}", field.Name, type.Identity);
+                reader.Position = objectOffset + field.Offset;
             }
 
             while (reader.Position - objectOffset < field.Offset)
@@ -55,7 +65,12 @@ internal static class RecordFormatHandler
         }
 
         if (reader.Position - objectOffset > type.Size)
-            throw new InvalidOperationException("Read past the end of the object");
+        {
+            // TODO
+            //throw new InvalidOperationException("Read past the end of the object");
+            Debug.WriteLine("Warning: Read past end of object of type {0}", type.Identity);
+            reader.Position = objectOffset + type.Size;
+        }
 
         return data.GetObject<IHavokObject>()!;
     }

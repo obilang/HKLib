@@ -28,12 +28,20 @@ public abstract class HavokType : IEquatable<HavokType>
     /// <summary>
     /// Size of the type in bytes
     /// </summary>
-    public int Size { get; init; }
+    public int Size { get; internal set; }
 
     /// <summary>
     /// Byte alignment of the type
     /// </summary>
-    public int Alignment { get; init; }
+    public int Alignment { get; internal set; }
+
+
+    // Optional convenience
+    internal void OverrideLayout(int size, int alignment)
+    {
+        Size = size;
+        Alignment = alignment;
+    }
 
     /// <summary>
     /// Parent class of the type

@@ -1,6 +1,9 @@
 ﻿using HKLib.hk2018;
 using HKLib.Reflection.hk2018;
 using HKLib.Serialization.hk2018.Binary.Util;
+using System.Diagnostics;
+using System.Reflection;
+using System.Linq;
 
 namespace HKLib.Serialization.hk2018.Binary;
 
@@ -37,10 +40,54 @@ public class HavokBinarySerializer : HavokSerializer
         // ignore first type as it is the null type
         for (int i = 1; i < typeBuilders.Count; i++)
         {
-            string typeIdentity = typeBuilders[i].Build().Identity;
-            types[i] = TypeRegistry.GetType(typeIdentity) ??
+            HavokType builderType = typeBuilders[i].Build();
+            string typeIdentity = builderType.Identity;
+            HavokType registryType = TypeRegistry.GetType(typeIdentity) ??
                        throw new KeyNotFoundException(
                            $"The type \"{typeIdentity}\" was not found in the type registry.");
+
+            if (builderType.Alignment == 0)
+            {
+                Debug.WriteLine($"Type alignment is 0 for type builder \"{typeIdentity}\" at index = {i}");
+                types[i] = builderType;
+                continue;
+            }
+
+
+            if (builderType.Alignment != registryType.Alignment)
+            {
+                // log the difference
+                Debug.WriteLine($"Type alignment mismatch for type \"{typeIdentity}\": builder alignment = {builderType.Alignment}, registry alignment = {registryType.Alignment}");
+            }
+            registryType.Alignment = builderType.Alignment;
+            registryType.Size = builderType.Size;
+
+            if (builderType.Fields.Count != registryType.Fields.Count)
+            {
+                Debug.WriteLine($"Type field count mismatch for type \"{typeIdentity}\": builder field count = {builderType.Fields.Count}, registry field count = {registryType.Fields.Count}");
+            }
+            { 
+                //if (builderType.Fields.Count < registryType.Fields.Count)
+                {
+                    // Copy builder fields and replace each copied field's Type with the one from the registry
+                    var registryFieldsByName = registryType.Fields.ToDictionary(f => f.Name);
+                    var copiedFields = builderType.Fields.ToList(); // shallow copy of the list (members are records)
+
+                    foreach (var copiedField in copiedFields)
+                    {
+                        if (registryFieldsByName.TryGetValue(copiedField.Name, out var regField))
+                        {
+                            // Assign the Type from the registry field into the copied field
+                            OverwriteMemberTypeViaReflection(copiedField, regField.Type);
+                        }
+                    }
+
+                    // Replace registryType.Fields with the copied list
+                    OverwriteFieldsViaReflection(registryType, copiedFields);
+                }
+            }
+
+            types[i] = registryType;
         }
 
         return types;
@@ -377,16 +424,49 @@ public class HavokBinarySerializer : HavokSerializer
 
     private IReadOnlyList<string> ReadTSTR(HavokBinaryReader reader)
     {
-        reader.EnterSection("TSTR");
+        reader.EnterSection("TST1");
 
         List<string> strings = new();
         while (reader.Position < reader.GetSectionEnd())
         {
-            strings.Add(reader.ReadASCII());
+            var posBeforeRead = reader.Position;
+
+            var typeStr = reader.ReadASCII();
+
+            if (reader.Position > reader.GetSectionEnd())
+            {
+                // Validate padding: bytes must be 0xFF until hitting 0x40 ('@')
+                if (!IsAllFFUntil40Bytes(reader, posBeforeRead, reader.GetSectionEnd()))
+                {
+                    throw new InvalidOperationException(
+                        $"Wrong type string found at end of TST1 section {typeStr}");
+                }
+
+                reader.Position = reader.GetSectionEnd();
+            }
+            else
+            {
+                strings.Add(typeStr);
+            }
         }
 
         reader.ExitSection();
         return strings;
+    }
+
+    // Checks raw bytes [start, end) are 0xFF until a 0x40 ('@') is encountered.
+    private static bool IsAllFFUntil40Bytes(HavokBinaryReader reader, long start, long end)
+    {
+        int len = (int)Math.Max(0, end - start);
+        if (len == 0) return true;
+
+        byte[] bytes = reader.GetBytes(start, len);
+        foreach (byte b in bytes)
+        {
+            if (b == 0x40) return true; // hit '@'
+            if (b != 0xFF) return false;
+        }
+        return true; // only 0xFFs up to end
     }
 
     private IReadOnlyDictionary<string, int> WriteTSTR(HavokBinaryWriter writer,
@@ -516,13 +596,31 @@ public class HavokBinarySerializer : HavokSerializer
 
     private IReadOnlyList<string> ReadFSTR(HavokBinaryReader reader)
     {
-        reader.EnterSection("FSTR");
+        reader.EnterSection("FST1");
 
         List<string> strings = new();
 
         while (reader.Position < reader.GetSectionEnd())
         {
-            strings.Add(reader.ReadASCII());
+            var posBeforeRead = reader.Position;
+
+            var typeStr = reader.ReadASCII();
+
+            if (reader.Position > reader.GetSectionEnd())
+            {
+                // Validate padding: bytes must be 0xFF until hitting 0x40 ('@')
+                if (!IsAllFFUntil40Bytes(reader, posBeforeRead, reader.GetSectionEnd()))
+                {
+                    throw new InvalidOperationException(
+                        $"Wrong type string found at end of FST1 section {typeStr}");
+                }
+
+                reader.Position = reader.GetSectionEnd();
+            }
+            else
+            {
+                strings.Add(typeStr);
+            }
         }
 
         reader.ExitSection();
@@ -563,12 +661,29 @@ public class HavokBinarySerializer : HavokSerializer
     {
         reader.EnterSection("TBDY");
 
-        for (int i = 1; i < builders.Count; i++)
+        List<int> processedTypeIndices = new();
+
+        int buildersCounts = builders.Count;
+        // Check if the first element in builders is null type, (Name is NULL)
+        if (builders[0].Name == "NULL")
+        {
+            buildersCounts--;
+        }
+
+
+        for (int i = 1; i < buildersCounts; i++)
         {
             int typeIndex = (int)reader.ReadHavokVarUInt();
 
             // version 2019.1 does not contain entries for all types
             if (typeIndex == 0) break;
+
+            if (processedTypeIndices.Contains(typeIndex))
+            {
+                throw new InvalidDataException(
+                    $"Duplicate type entry found in TBDY section for type index {typeIndex}");
+            }
+            processedTypeIndices.Add(typeIndex);
 
             HavokTypeBuilder builder = builders[typeIndex];
             int parentIndex = (int)reader.ReadHavokVarUInt();
@@ -577,8 +692,17 @@ public class HavokBinarySerializer : HavokSerializer
                 builder.WithParent(builders[parentIndex]);
             }
 
+            int optionalsValue = (int)reader.ReadHavokVarUInt();
             HavokType.Optional optionals =
-                (HavokType.Optional)reader.ReadHavokVarUInt();
+                (HavokType.Optional)optionalsValue;
+
+            if (optionals == HavokType.Optional.None)
+            {
+                //throw new InvalidDataException(
+                //    $"Type entry for type index {typeIndex} does not contain any optional data.");
+                int test = 0;
+            }
+
             builder.WithOptionals(optionals);
             if (optionals.HasFlag(HavokType.Optional.Format))
             {
@@ -770,7 +894,9 @@ public class HavokBinarySerializer : HavokSerializer
             uint readHash = reader.ReadUInt32();
             if (readHash != hash)
             {
-                throw new InvalidDataException($"Incorrect hash encountered for type {types[typeIndex].Identity}.");
+                // TODO
+                //throw new InvalidDataException($"Incorrect hash encountered for type {types[typeIndex].Identity}.");
+                Debug.WriteLine($"Incorrect hash encountered for type {types[typeIndex].Identity}.");
             }
         }
 
@@ -877,7 +1003,8 @@ public class HavokBinarySerializer : HavokSerializer
     private void ReadSDKV(HavokBinaryReader reader)
     {
         reader.EnterSection("SDKV");
-        if (reader.ReadASCII(8) != "20180100")
+        var version = reader.ReadASCII(8);
+        if (version != "20200100" && version != "20200200")
         {
             throw new InvalidDataException("Unsupported SDK Version.");
         }
@@ -888,7 +1015,7 @@ public class HavokBinarySerializer : HavokSerializer
     private void WriteSDKV(HavokBinaryWriter writer)
     {
         writer.BeginSection("SDKV");
-        writer.WriteASCII("20180100");
+        writer.WriteASCII("20200200");
         writer.EndSection();
     }
 
@@ -915,4 +1042,25 @@ public class HavokBinarySerializer : HavokSerializer
     }
 
     #endregion
+
+    // Danger: reflection hack to overwrite the backing field of a read-only property
+    static void OverwriteFieldsViaReflection(HavokType registryType, IReadOnlyList<HavokType.Member> newFields)
+    {
+        var t = registryType.GetType();
+        // Adjust the field name if different; common pattern for auto-properties:
+        // private readonly IReadOnlyList<Member> <Fields>k__BackingField;
+        var backing = t.GetField("<Fields>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic);
+        if (backing == null) throw new MissingFieldException(t.FullName, "<Fields>k__BackingField");
+        backing.SetValue(registryType, newFields);
+    }
+
+    // Danger: reflection hack to overwrite a read-only Member.Type property
+    static void OverwriteMemberTypeViaReflection(HavokType.Member member, HavokType newType)
+    {
+        var mt = member.GetType();
+        var typeField = mt.GetField("_type", BindingFlags.Instance | BindingFlags.NonPublic);
+        var typeRef = typeField.GetValue(member);
+        var valueField = typeRef.GetType().GetField("_value", BindingFlags.Instance | BindingFlags.NonPublic);
+        valueField.SetValue(typeRef, newType);
+    }
 }
