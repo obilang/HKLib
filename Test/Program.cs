@@ -36,7 +36,7 @@ namespace ColladaTest
 
 
             // Animation
-            string animation_hkxPath = @"E:\Workspace\FF16\Output\animation\chara\c1001\animation\a0001\common\ramuh\judgement_atk01.anmb";
+            string animation_hkxPath = @"E:\Workspace\FF16\Output\animation\chara\c1001\animation\a0001\common\bahamut\bahamut_flarebreath_loop.anmb";
 
             var serializer2 = new HavokBinarySerializer();
 

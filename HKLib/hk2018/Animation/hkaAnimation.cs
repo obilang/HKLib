@@ -1,7 +1,3 @@
-// Automatically Generated
-
-using static HKLib.hk2018.hkbVariableBindingSet;
-
 namespace HKLib.hk2018;
 
 public class hkaAnimation : hkReferencedObject
@@ -18,7 +14,6 @@ public class hkaAnimation : hkReferencedObject
 
     public List<hkaAnnotationTrack> m_annotationTracks = new();
 
-    // Matches C++ comment: must mirror hkaAnimatedSkeleton::BoneAnnotation layout
     public struct TrackAnnotation
     {
         public ushort m_trackID;
@@ -56,9 +51,6 @@ public class hkaAnimation : hkReferencedObject
     }
 
     // Sampling API: to be overridden by concrete animation types
-    public virtual void sampleTracks(float time, hkQsTransform[] transformTracksOut, float[] floatTracksOut)
-        => throw new NotSupportedException("sampleTracks not implemented for this type of animation.");
-
     public virtual Dictionary<int, List<hkQsTransform>> fetchAllTracks()
         => throw new NotSupportedException("fetchAllTracks not implemented for this type of animation.");
 

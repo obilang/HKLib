@@ -39,6 +39,7 @@ public static class PredictiveBlockCompression
         }
     }
 
+    // IMPORTANT NOTE: Haven't verified correctness of this implementation against Havok's original.
     #region Encoding
 
     /// <summary>
@@ -230,80 +231,6 @@ public static class PredictiveBlockCompression
     #endregion
 
     #region Decoding
-    //public static short[][] DecodeAllFrameChannel(byte[] data)
-    //{
-    //    // Temp array for testing. (formal data is stored in hkaanimation intarray
-    //    uint[] frameDivideOffset = { 0, 2563, 5034, 7792, 10802, 13819, 15301};
-
-    //    // temp: number of channels is from the animation data
-    //    uint totalChannelCount = 172;
-    //    short[][] channelFrameVal = new short[totalChannelCount][];
-    //    // temp: number of frames is from the animation data
-    //    uint totalFrameCount = 85;
-    //    uint fetchedFrameCount = 0;
-
-    //    for (int frameDivideIdx = 0; frameDivideIdx < frameDivideOffset.Length - 1; frameDivideIdx++)
-    //    {
-    //        uint frameDataOffset = frameDivideOffset[frameDivideIdx];
-
-    //        uint endPos = 0;
-
-    //        uint fetchedChannelCount = 0;
-
-    //        //while (endPos < frameDivideOffset[frameDivideIdx + 1])
-    //        while (fetchedChannelCount < totalChannelCount)
-    //        {
-    //            uint channelCount = Math.Min(BLOCK_CHANNELS, totalChannelCount - fetchedChannelCount);
-    //            uint frameCount = Math.Min(BLOCK_FRAMES, totalFrameCount - fetchedFrameCount);
-
-    //            if (channelCount < BLOCK_CHANNELS)
-    //            {
-    //                //for debug
-    //                int test = 1;
-    //            }
-
-    //            if (frameCount < BLOCK_FRAMES)
-    //            {
-    //                //for debug
-    //                int test = 1;
-    //            }
-
-    //            Block block = DecodeWholeBlock(data, channelCount, frameCount, out endPos, frameDataOffset);
-
-    //            // Add logging here
-    //            Console.WriteLine($"Block {frameDivideIdx}: decoded {frameCount} frames, " +
-    //                              $"fetchedFrameCount={fetchedFrameCount}, " +
-    //                              $"destOffset={frameDivideIdx * 16}");
-
-    //            frameDataOffset = endPos;
-
-    //            for (int i = 0; i < channelCount; i++)
-    //            {
-    //                if (channelFrameVal[fetchedChannelCount + i] == null)
-    //                {
-
-    //                    channelFrameVal[fetchedChannelCount + i] = new short[totalFrameCount];
-    //                }
-    //                Array.Copy(block.Data[i], 0,
-    //                    channelFrameVal[fetchedChannelCount + i],
-    //                    frameDivideIdx * 16,
-    //                    frameCount);
-    //            }
-
-    //            fetchedChannelCount = fetchedChannelCount + channelCount;
-    //        }
-
-    //        if (endPos != frameDataOffset)
-    //        {
-    //            // for debug
-    //            int test = 1;
-    //        }
-
-    //        fetchedFrameCount += BLOCK_FRAMES;
-    //    }
-    //    return channelFrameVal;
-    //}
-
     public static short[][] DecodeAllFrameChannel(byte[] data, ushort[] blockOffsets, int totalChannelCount, int totalFrameCount)
     {
         short[][] channelFrameVal = new short[totalChannelCount][];
@@ -334,7 +261,6 @@ public static class PredictiveBlockCompression
             int fetchedChannelCount = 0;
 
             // Calculate the actual frame range this block contains in the compressed data
-            // TODO: the decompressed value not same at overlapping frames, need to verify
             // Block 0: frames 0-15 (starting at compressed frame 0)
             // Block 1: frames 15-30 (starting at compressed frame 15, overlaps at 15)
             // Block 2: frames 30-45 (starting at compressed frame 30, overlaps at 30)
@@ -342,8 +268,8 @@ public static class PredictiveBlockCompression
             int remainingFrames = totalFrameCount - compressedFrameStart;
             int frameCount = Math.Min(BLOCK_FRAMES, remainingFrames);
 
-            Console.WriteLine($"Block {frameDivideIdx}: compressedFrameStart={compressedFrameStart}, " +
-                             $"frameCount={frameCount}, outputFrameOffset={outputFrameOffset}");
+            //Console.WriteLine($"Block {frameDivideIdx}: compressedFrameStart={compressedFrameStart}, " +
+            //                 $"frameCount={frameCount}, outputFrameOffset={outputFrameOffset}");
 
             // Process all channels for this frame block
             while (fetchedChannelCount < totalChannelCount)
@@ -375,12 +301,6 @@ public static class PredictiveBlockCompression
 
             // Update output offset: first block adds 16 frames, subsequent blocks add 15
             outputFrameOffset += (frameDivideIdx == 0) ? frameCount : (frameCount - 1);
-
-            if (endPos != blockOffsetsVal[frameDivideIdx+1])
-            {
-                // for debug
-                int test = 1;
-            }
         }
 
         return channelFrameVal;

@@ -1,9 +1,5 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using static HKLib.hk2018.hclVolumeConstraint;
-using static HKLib.hk2018.hkSkinnedMeshShape;
-
-// Automatically Generated
 
 namespace HKLib.hk2018;
 
@@ -27,10 +23,28 @@ public class hkaPredictiveCompressedAnimation : hkaAnimation
 
     public int m_firstFloatBlockScaleAndOffsetIndex;
 
+    public class TrackCompressionParams : IHavokObject
+    {
+        public float m_staticTranslationTolerance;
+
+        public float m_staticRotationTolerance;
+
+        public float m_staticScaleTolerance;
+
+        public float m_staticFloatTolerance;
+
+        public float m_dynamicTranslationTolerance;
+
+        public float m_dynamicRotationTolerance;
+
+        public float m_dynamicScaleTolerance;
+
+        public float m_dynamicFloatTolerance;
+
+    }
+
     private hkaSkeleton? _skeleton;
 
-    private const int NUM_INT_ARRAYS = 9;
-    private const int NUM_FLOAT_ARRAYS = 3;
 
     private enum IntArrayID
     {
@@ -54,9 +68,6 @@ public class hkaPredictiveCompressedAnimation : hkaAnimation
         NUM_FLOAT_ARRAYS
     }
 
-    private const int BLOCK_FRAMES = 16;
-    private const int BLOCK_FRAME_OVERLAP = 1;
-    private const int BLOCK_CHANNELS = 16;
 
     private ReadOnlySpan<ushort> getArray(IntArrayID x) => CollectionsMarshal.AsSpan(m_intData).Slice(m_intArrayOffsets[(int)x], getArrayLength(x));
 
@@ -76,38 +87,6 @@ public class hkaPredictiveCompressedAnimation : hkaAnimation
         int start = m_floatArrayOffsets[(int)x];
         int end = (x == FloatArrayID.NUM_FLOAT_ARRAYS - 1) ? (m_floatData.Count - EXTRA_ELEMS) : m_floatArrayOffsets[(int)x + 1];
         return end - start;
-    }
-
-    private uint getBlockOffset(IntArrayID intArrayId, int blockColumnIndex)
-    {
-        var b = getArray(intArrayId);
-        int index = blockColumnIndex * 2;
-
-        // Return 0 if array is too small (matches C++ padding behavior)
-        if (index >= b.Length)
-            return 0;
-
-        ushort lo = b[index];
-        ushort hi = (index + 1 < b.Length) ? b[index + 1] : (ushort)0;
-
-        return (uint)(lo | (hi << 16));
-    }
-
-    private void getCompressedDataOffset(uint frame, out uint start, out uint end)
-    {
-        int block = (int)frame / (BLOCK_FRAMES - BLOCK_FRAME_OVERLAP);
-        start = 0;
-        if (block != 0)
-        {
-            start = getBlockOffset(IntArrayID.BLOCK_OFFSETS, block - 1);
-        }
-        end = getBlockOffset(IntArrayID.BLOCK_OFFSETS, block);
-    }
-
-    private uint getCompressedDataOffsetForFirstFloatBlock(uint frame)
-    {
-        int block = (int)frame / (BLOCK_FRAMES - BLOCK_FRAME_OVERLAP);
-        return getBlockOffset(IntArrayID.FIRST_FLOAT_BLOCK_OFFSETS, block);
     }
 
     private static void applyWeights(ReadOnlySpan<ushort> bitmap, Span<byte> weights, int n)
@@ -148,145 +127,11 @@ public class hkaPredictiveCompressedAnimation : hkaAnimation
         v = new Quaternion(v.X, v.Y, v.Z, w);
     }
 
-    public class TrackCompressionParams : IHavokObject
-    {
-        public float m_staticTranslationTolerance;
-
-        public float m_staticRotationTolerance;
-
-        public float m_staticScaleTolerance;
-
-        public float m_staticFloatTolerance;
-
-        public float m_dynamicTranslationTolerance;
-
-        public float m_dynamicRotationTolerance;
-
-        public float m_dynamicScaleTolerance;
-
-        public float m_dynamicFloatTolerance;
-
-        // Default constructor with reasonable default tolerances
-        public TrackCompressionParams()
-        {
-            // Use small tolerances as sensible defaults; adjust as needed.
-            m_staticTranslationTolerance = 0.0001f;
-            m_staticRotationTolerance = 0.0001f;
-            m_staticScaleTolerance = 0.0001f;
-            m_staticFloatTolerance = 0.0001f;
-            m_dynamicTranslationTolerance = 0.0001f;
-            m_dynamicRotationTolerance = 0.0f;
-            m_dynamicScaleTolerance = 0.0001f;
-            m_dynamicFloatTolerance = 0.0001f;
-        }
-
-        // Optional: convenience constructor to set custom tolerances
-        public TrackCompressionParams(
-            float staticTranslationTolerance,
-            float staticRotationTolerance,
-            float staticScaleTolerance,
-            float staticFloatTolerance,
-            float dynamicTranslationTolerance,
-            float dynamicRotationTolerance,
-            float dynamicScaleTolerance,
-            float dynamicFloatTolerance)
-        {
-            m_staticTranslationTolerance = staticTranslationTolerance;
-            m_staticRotationTolerance = staticRotationTolerance;
-            m_staticScaleTolerance = staticScaleTolerance;
-            m_staticFloatTolerance = staticFloatTolerance;
-            m_dynamicTranslationTolerance = dynamicTranslationTolerance;
-            m_dynamicRotationTolerance = dynamicRotationTolerance;
-            m_dynamicScaleTolerance = dynamicScaleTolerance;
-            m_dynamicFloatTolerance = dynamicFloatTolerance;
-        }
-    }
-
-    // Compression parameters palette container mirroring the C++ API
-    public class CompressionParams : IHavokObject
-    {
-        // List of parameter sets to enable per-track compression settings
-        public List<TrackCompressionParams> m_parameterPalette = new();
-
-        // Map track index -> palette index
-        public List<uint> m_trackIndexToPaletteIndex = new();
-
-        // Map float track index -> palette index
-        public List<uint> m_floatTrackIndexToPaletteIndex = new();
-
-        // Create a single palette entry for all bones and floats, using default tolerances.
-        public CompressionParams()
-        {
-            m_parameterPalette.Add(new TrackCompressionParams());
-        }
-
-        // Create a single palette entry for all bones and floats, using the given tolerances.
-        public CompressionParams(
-            float staticTranslationTolerance, float staticRotationTolerance, float staticScaleTolerance, float staticFloatTolerance,
-            float dynamicTranslationTolerance, float dynamicRotationTolerance, float dynamicScaleTolerance, float dynamicFloatTolerance)
-        {
-            m_parameterPalette.Add(new TrackCompressionParams(
-                staticTranslationTolerance, staticRotationTolerance, staticScaleTolerance, staticFloatTolerance,
-                dynamicTranslationTolerance, dynamicRotationTolerance, dynamicScaleTolerance, dynamicFloatTolerance));
-        }
-
-        private uint getTransformTrackPaletteIndex(int track)
-        {
-            return (track >= 0 && track < m_trackIndexToPaletteIndex.Count)
-                ? m_trackIndexToPaletteIndex[track]
-                : 0u;
-        }
-
-        private uint getFloatTrackPaletteIndex(int track)
-        {
-            return (track >= 0 && track < m_floatTrackIndexToPaletteIndex.Count)
-                ? m_floatTrackIndexToPaletteIndex[track]
-                : 0u;
-        }
-
-        private TrackCompressionParams getTransformParams(int track)
-        {
-            int idx = (int)getTransformTrackPaletteIndex(track);
-            if (idx < 0 || idx >= m_parameterPalette.Count) idx = 0;
-            return m_parameterPalette.Count > 0 ? m_parameterPalette[idx] : new TrackCompressionParams();
-        }
-
-        private TrackCompressionParams getFloatParams(int track)
-        {
-            int idx = (int)getFloatTrackPaletteIndex(track);
-            if (idx < 0 || idx >= m_parameterPalette.Count) idx = 0;
-            return m_parameterPalette.Count > 0 ? m_parameterPalette[idx] : new TrackCompressionParams();
-        }
-
-        public float getStaticTranslationTolerance(int transformTrack) => getTransformParams(transformTrack).m_staticTranslationTolerance;
-        public float getStaticRotationTolerance(int transformTrack) => getTransformParams(transformTrack).m_staticRotationTolerance;
-        public float getStaticScaleTolerance(int transformTrack) => getTransformParams(transformTrack).m_staticScaleTolerance;
-        public float getStaticFloatTolerance(int floatTrack) => getFloatParams(floatTrack).m_staticFloatTolerance;
-        public float getDynamicTranslationTolerance(int transformTrack) => getTransformParams(transformTrack).m_dynamicTranslationTolerance;
-        public float getDynamicRotationTolerance(int transformTrack) => getTransformParams(transformTrack).m_dynamicRotationTolerance;
-        public float getDynamicScaleTolerance(int transformTrack) => getTransformParams(transformTrack).m_dynamicScaleTolerance;
-        public float getDynamicFloatTolerance(int floatTrack) => getFloatParams(floatTrack).m_dynamicFloatTolerance;
-    }
-
     public hkaPredictiveCompressedAnimation()
     {
         m_type = AnimationType.HK_PREDICTIVE_COMPRESSED_ANIMATION;
     }
 
-    public hkaPredictiveCompressedAnimation(hkaAnimationBinding binding, hkaSkeleton skeleton)
-            : base(binding.m_animation)
-    {
-        var defaultParams = new CompressionParams();
-    }
-
-    // Size in bytes estimate similar to C++ implementation
-    public int getSizeInBytes()
-    {
-        return sizeof(int) /*vtable-ish placeholder in C++ sizeof*/ +
-            m_compressedData.Count * sizeof(byte) +
-            m_intData.Count * sizeof(ushort) +
-            m_floatData.Count * sizeof(float);
-    }
 
     // Set associated skeleton (validates track counts when available)
     public override void setSkeleton(hkaSkeleton skeleton)
@@ -327,12 +172,6 @@ public class hkaPredictiveCompressedAnimation : hkaAnimation
         ReadOnlySpan<float> offsetPtr = getArray(FloatArrayID.DYNAMIC_OFFSETS);
         ReadOnlySpan<ushort> isAnimated = getArray(IntArrayID.IS_ANIMATED_BITMAP);
         ReadOnlySpan<ushort> isFixedRange = getArray(IntArrayID.IS_FIXED_RANGE_BITMAP);
-        //ReadOnlySpan<ushort> dynamicIdx = getArray(IntArrayID.DYNAMIC_BONE_TRACK_INDEX);
-
-        int scaleIndex = 0;
-        int offsetIndex = 0;
-        int isFixedRangeIndex = 0;
-        int compressedDataIndex = 0;
 
         if (m_numFloatSlots > 0)
         {
@@ -371,18 +210,18 @@ public class hkaPredictiveCompressedAnimation : hkaAnimation
                 }
             }
 
+            List<int> boneNeedRecoverW = new List<int>();
             // Copy static values
-            ReadOnlySpan<ushort> staticIdx = getArray(IntArrayID.STATIC_BONE_TRACK_INDEX);
+            ReadOnlySpan<ushort> staticIdxArray = getArray(IntArrayID.STATIC_BONE_TRACK_INDEX);
             int nstatic = getArrayLength(IntArrayID.STATIC_BONE_TRACK_INDEX);
             if (nstatic > 0)
             {
                 ReadOnlySpan<float> staticVals = getArray(FloatArrayID.STATIC_VALUES);
-                int staticIndex = 0;
 
-                for (int i = 0; i < nstatic && staticIdx[i] < numFloatsPerBone; i++)
+                for (int i = 0; i < nstatic && staticIdxArray[i] < numFloatsPerBone; i++)
                 {
-                    int channelIdx = staticIdx[i];
-                    float v = staticVals[staticIndex++];
+                    int channelIdx = staticIdxArray[i];
+                    float v = staticVals[i];
 
                     // find ref bone index
                     int boneIndex = channelIdx / 12;
@@ -393,20 +232,28 @@ public class hkaPredictiveCompressedAnimation : hkaAnimation
                     {
                         var boneFrame = allTracks[boneIndex][f];
                         setBoneChannelVal(ref boneFrame, channelIdx % 12, v);
-                        quaternionRecoverW(ref boneFrame.m_rotation);
+                        //quaternionRecoverW(ref boneFrame.m_rotation);
                         allTracks[boneIndex][f] = boneFrame;
+                    }
+
+                    if (channelIdx % 12 >= 4 && channelIdx % 12 <= 6)
+                    {
+                        // rotation channel, need recover W later
+                        if (boneNeedRecoverW.Contains(boneIndex) == false)
+                            boneNeedRecoverW.Add(boneIndex);
                     }
                 }
             }
 
-            //return allTracks;
 
             // Copy dynamic values
             int ndynamic = getArrayLength(IntArrayID.DYNAMIC_BONE_TRACK_INDEX);
             ReadOnlySpan<ushort> dynamicIdx = getArray(IntArrayID.DYNAMIC_BONE_TRACK_INDEX);
+            bool hasFixedRange = false;
             if (ndynamic > 0)
             {
                 ReadOnlySpan<ushort> blockOffsets = getArray(IntArrayID.BLOCK_OFFSETS);
+                // decode the m_compressedData
                 var dynamicValChannelFrame = PredictiveBlockCompression.DecodeAllFrameChannel(m_compressedData.ToArray(), blockOffsets.ToArray(), ndynamic, m_numFrames);
 
                 // Fixed scale and offset for fixed-range channels
@@ -429,6 +276,7 @@ public class hkaPredictiveCompressedAnimation : hkaAnimation
                         // Use fixed scale/offset for this channel
                         scale = fixedScale;
                         offset = fixedOffset;
+                        hasFixedRange = true;
                     }
                     else
                     {
@@ -446,40 +294,47 @@ public class hkaPredictiveCompressedAnimation : hkaAnimation
                     for (int f = 0; f < m_numFrames; f++)
                     {
                         var boneFrame = allTracks[boneIndex][f];
-                        
                         setBoneChannelVal(ref boneFrame, channelIdx % 12, dynamicValChannelFrame[i][f] * scale + offset);
-                        quaternionRecoverW(ref boneFrame.m_rotation);
-
+                        //quaternionRecoverW(ref boneFrame.m_rotation);
                         allTracks[boneIndex][f] = boneFrame;
+                    }
+
+                    if (channelIdx % 12 >= 4 && channelIdx % 12 <= 6)
+                    {
+                        // rotation channel, need recover W later
+                        if (boneNeedRecoverW.Contains(boneIndex) == false)
+                            boneNeedRecoverW.Add(boneIndex);
                     }
                 }
             }
 
+            if (hasFixedRange)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                // For me to notice during testing. Didn't find one in my test files yet.
+                Console.WriteLine("This animation has fixed range");
+                Console.ResetColor();
+            }
 
-            //// Recover and interpolate w components of quaternions
+
+            // Recover and interpolate w components of quaternions
+            for (int i = 0; i < boneNeedRecoverW.Count; i++)
+            {
+                int boneIndex = boneNeedRecoverW[i];
+                if (!allTracks.ContainsKey(boneIndex))
+                    continue;
+                for (int f = 0; f < m_numFrames; f++)
+                {
+                    var boneFrame = allTracks[boneIndex][f];
+                    quaternionRecoverW(ref boneFrame.m_rotation);
+                    allTracks[boneIndex][f].m_rotation = Quaternion.Normalize(boneFrame.m_rotation);
+                }
+            }
+
+            // There is data for renormalizing quaternions, but since we have already recovered W, we can skip it
             //ReadOnlySpan<ushort> normQuaternions = getArray(IntArrayID.RENORM_QUATERNION_INDEX);
             //int nquats = getArrayLength(IntArrayID.RENORM_QUATERNION_INDEX);
             //if (nquats > 0)
-            //{
-            //    for (int i = 0; i < nquats; i++)
-            //    {
-            //        int channelIdx = normQuaternions[i];
-            //        if (channelIdx >= numFloatsPerBone) break;
-
-            //        // find ref bone index
-            //        int boneIndex = channelIdx / 12;
-            //        if (!allTracks.ContainsKey(boneIndex))
-            //            continue;
-
-            //        for (int f = 0; f < m_numFrames; f++)
-            //        {
-            //            //TODO: somehow this operation has wrong result
-            //            var boneFrame = allTracks[boneIndex][f];
-            //            quaternionRecoverW(ref boneFrame.m_rotation);
-            //            allTracks[boneIndex][f].m_rotation = Quaternion.Normalize(boneFrame.m_rotation);
-            //        }
-            //    }
-            //}
         }
 
         return allTracks;
