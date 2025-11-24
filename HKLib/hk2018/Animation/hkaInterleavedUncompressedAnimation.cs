@@ -17,9 +17,6 @@ public partial class hkaInterleavedUncompressedAnimation : hkaAnimation
             _skeleton = null;
             return;
         }
-
-        if (skeleton.m_bones.Count != m_numberOfTransformTracks)
-            throw new ArgumentException("Number of skeleton bones does not match animation transform tracks", nameof(skeleton));
         
         if (skeleton.m_floatSlots.Count != m_numberOfFloatTracks)
             throw new ArgumentException("Number of skeleton float slots does not match animation float tracks", nameof(skeleton));
