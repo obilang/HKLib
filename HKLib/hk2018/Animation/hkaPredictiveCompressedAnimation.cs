@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
@@ -107,7 +108,7 @@ public class hkaPredictiveCompressedAnimation : hkaAnimation
     }
 
 
-    private static void quaternionRecoverW(ref Quaternion v, bool usingManhattan=true)
+    private static void quaternionRecoverW(ref Quaternion v, bool usingManhattan = true)
     {
         float w;
         if (usingManhattan)
@@ -163,7 +164,7 @@ public class hkaPredictiveCompressedAnimation : hkaAnimation
         }
     }
 
-    public override Dictionary<int, List<hkQsTransform>> fetchAllTracks()
+    public override List<List<hkQsTransform>> fetchAllTracks()
     {
         Dictionary<int, List<hkQsTransform>> allTracks = new();
         var refBones = _skeleton?.m_referencePose.ToArray() ?? Array.Empty<hkQsTransform>();
@@ -337,7 +338,21 @@ public class hkaPredictiveCompressedAnimation : hkaAnimation
             //if (nquats > 0)
         }
 
-        return allTracks;
+
+        List<List<hkQsTransform>> convertedTracks = new List<List<hkQsTransform>>();
+
+        for (int i = 0; i < m_numFrames; i++)
+        {
+            List<hkQsTransform> frameTransforms = new List<hkQsTransform>();
+
+            foreach (var kvp in allTracks)
+            {
+                frameTransforms.Add(kvp.Value[i]);
+            }
+            convertedTracks.Add(frameTransforms);
+        }
+
+        return convertedTracks;
     }
 }
 

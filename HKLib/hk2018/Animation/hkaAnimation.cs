@@ -50,8 +50,10 @@ public class hkaAnimation : hkReferencedObject
         m_annotationTracks = that.m_annotationTracks;
     }
 
-    // Sampling API: to be overridden by concrete animation types
-    public virtual Dictionary<int, List<hkQsTransform>> fetchAllTracks()
+    // Returns List<List<hkQsTransform>> where:
+    // - Outer list index is the frame number
+    // - Inner list index is the bone index (as defined by animation binding)
+    public virtual List<List<hkQsTransform>> fetchAllTracks()
         => throw new NotSupportedException("fetchAllTracks not implemented for this type of animation.");
 
     public virtual hkaSkeleton? getSkeleton() => null;

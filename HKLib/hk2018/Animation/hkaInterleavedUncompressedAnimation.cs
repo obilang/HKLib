@@ -17,7 +17,10 @@ public partial class hkaInterleavedUncompressedAnimation : hkaAnimation
             _skeleton = null;
             return;
         }
-        
+
+        //if (skeleton.m_bones.Count != m_numberOfTransformTracks)
+        //    throw new ArgumentException("Number of skeleton bones does not match animation transform tracks", nameof(skeleton));
+
         if (skeleton.m_floatSlots.Count != m_numberOfFloatTracks)
             throw new ArgumentException("Number of skeleton float slots does not match animation float tracks", nameof(skeleton));
 
@@ -26,9 +29,9 @@ public partial class hkaInterleavedUncompressedAnimation : hkaAnimation
 
     public override hkaSkeleton? getSkeleton() => _skeleton;
 
-    public override Dictionary<int, List<hkQsTransform>> fetchAllTracks()
+    public override List<List<hkQsTransform>> fetchAllTracks()
     {
-        Dictionary<int, List<hkQsTransform>> allTracks = new();
+        List<List<hkQsTransform>> allTracks = new();
 
         if (m_numberOfTransformTracks == 0 || m_transforms.Count == 0)
         {
@@ -44,19 +47,19 @@ public partial class hkaInterleavedUncompressedAnimation : hkaAnimation
                 $"Invalid transform data: {m_transforms.Count} transforms is not evenly divisible by {m_numberOfTransformTracks} tracks");
         }
 
-        // Extract transforms for each track
-        // Data is stored interleaved: [frame0_track0, frame0_track1, ..., frame1_track0, frame1_track1, ...]
-        for (int track = 0; track < m_numberOfTransformTracks; track++)
+        // Initialize frames: outer list = frames, inner list = bones per frame
+        for (int frame = 0; frame < frameCount; frame++)
         {
-            List<hkQsTransform> trackFrames = new(frameCount);
+            List<hkQsTransform> bonesAtFrame = new(m_numberOfTransformTracks);
 
-            for (int frame = 0; frame < frameCount; frame++)
+            // Data is stored interleaved: [frame0_track0, frame0_track1, ..., frame1_track0, frame1_track1, ...]
+            for (int track = 0; track < m_numberOfTransformTracks; track++)
             {
                 int index = frame * m_numberOfTransformTracks + track;
-                trackFrames.Add(m_transforms[index]);
+                bonesAtFrame.Add(m_transforms[index]);
             }
 
-            allTracks[track] = trackFrames;
+            allTracks.Add(bonesAtFrame);
         }
 
         return allTracks;
