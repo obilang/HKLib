@@ -663,15 +663,7 @@ public class HavokBinarySerializer : HavokSerializer
 
         List<int> processedTypeIndices = new();
 
-        int buildersCounts = builders.Count;
-        // Check if the first element in builders is null type, (Name is NULL)
-        if (builders[0].Name == "NULL")
-        {
-            buildersCounts--;
-        }
-
-
-        for (int i = 1; i < buildersCounts; i++)
+        for (int i = 1; i < builders.Count; i++)
         {
             int typeIndex = (int)reader.ReadHavokVarUInt();
 
