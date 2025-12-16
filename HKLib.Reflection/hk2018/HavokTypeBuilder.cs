@@ -451,6 +451,17 @@ public class HavokTypeBuilder
     }
 
     /// <summary>
+    /// Constructs and adds a <see cref="HavokType.Member" /> with explicit alignment to the <see cref="HavokType.Fields" /> property.
+    /// </summary>
+    public HavokTypeBuilder WithField(string name, Reflection.HavokType.Member.MemberFlags flags, int offset,
+        HavokType type, ulong explicitAlignment)
+    {
+        CheckIfBuilt();
+        _fields.Add(new HavokType.Member(name, flags, offset, new TypeReference(type)) { ExplicitAlignment = explicitAlignment });
+        return this;
+    }
+
+    /// <summary>
     /// Constructs a <see cref="HavokType.Member" />, the type of which will be built by the provided
     /// <see cref="HavokTypeBuilder" />,
     /// and adds it to the <see cref="HavokType.Fields" /> property. The <see cref="HavokType" /> built by this instance will
@@ -463,6 +474,22 @@ public class HavokTypeBuilder
         TypeReference reference = new();
         typeBuilder.RegisterReference(reference);
         _fields.Add(new HavokType.Member(name, flags, offset, reference));
+        return this;
+    }
+
+    /// <summary>
+    /// Constructs a <see cref="HavokType.Member" /> with explicit alignment, the type of which will be built by the provided
+    /// <see cref="HavokTypeBuilder" />,
+    /// and adds it to the <see cref="HavokType.Fields" /> property. The <see cref="HavokType" /> built by this instance will
+    /// not be valid until the provided builder has finished building the type.
+    /// </summary>
+    public HavokTypeBuilder WithField(string name, Reflection.HavokType.Member.MemberFlags flags, int offset,
+        HavokTypeBuilder typeBuilder, ulong explicitAlignment)
+    {
+        CheckIfBuilt();
+        TypeReference reference = new();
+        typeBuilder.RegisterReference(reference);
+        _fields.Add(new HavokType.Member(name, flags, offset, reference) { ExplicitAlignment = explicitAlignment });
         return this;
     }
 
