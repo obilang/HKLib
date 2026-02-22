@@ -39,7 +39,7 @@ public class HavokTypeRegistry
 
     public IEnumerable<HavokType> Types => _typesFromIdentity.Values;
 
-    private static HavokTypeRegistry LoadDefault()
+    public static HavokTypeRegistry LoadDefault()
     {
         string basePath = AppDomain.CurrentDomain.BaseDirectory;
         string typeRegPath = Path.Join(basePath, "Res", "HavokTypeRegistry20180100.xml");

@@ -11,7 +11,7 @@ public class HavokBinarySerializer : HavokSerializer
 {
     private HavokCompendium? _compendium;
 
-    public HavokBinarySerializer() : this(HavokTypeRegistry.Instance) { }
+    public HavokBinarySerializer() : this(HavokTypeRegistry.LoadDefault()) { }
 
     public HavokBinarySerializer(HavokTypeRegistry typeRegistry) : base(typeRegistry) { }
 
