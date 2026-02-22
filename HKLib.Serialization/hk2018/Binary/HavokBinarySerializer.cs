@@ -734,11 +734,35 @@ public class HavokBinarySerializer : HavokSerializer
                 {
                     int nameIndex = (int)reader.ReadHavokVarUInt();
                     string name = fieldStrings[nameIndex];
+                    ulong flagsValue = reader.ReadHavokVarUInt();
+
+                    // Check if the alignment flag is set (bit beyond _DECL_MAX)
+                    const ulong alignFlag = 0x80; // This is likely _DECL_MAX << 1
+                    bool hasExplicitAlignment = (flagsValue & alignFlag) != 0;
+
+                    // Remove the alignment flag to get the actual member flags
                     Reflection.HavokType.Member.MemberFlags flags =
-                        (Reflection.HavokType.Member.MemberFlags)reader.ReadHavokVarUInt();
+                        (Reflection.HavokType.Member.MemberFlags)(flagsValue & ~alignFlag);
+
                     int offset = (int)reader.ReadHavokVarUInt();
+
+                    // If the alignment flag was set, read and store the alignment value
+                    ulong? explicitAlignment = null;
+                    if (hasExplicitAlignment)
+                    {
+                        explicitAlignment = reader.ReadHavokVarUInt();
+                    }
+
                     int memberTypeIndex = (int)reader.ReadHavokVarUInt();
-                    builder.WithField(name, flags, offset, builders[memberTypeIndex]);
+                    
+                    if (explicitAlignment.HasValue)
+                    {
+                        builder.WithField(name, flags, offset, builders[memberTypeIndex], explicitAlignment.Value);
+                    }
+                    else
+                    {
+                        builder.WithField(name, flags, offset, builders[memberTypeIndex]);
+                    }
                 }
             }
 
@@ -756,6 +780,12 @@ public class HavokBinarySerializer : HavokSerializer
             if (optionals.HasFlag(HavokType.Optional.Attributes))
             {
                 throw new NotImplementedException();
+            }
+
+            if (reader.Position >= reader.GetSectionEnd())
+            {
+                Debug.WriteLine($"Readed {processedTypeIndices.Count} types, while total type count is {builders.Count}");
+                break;
             }
         }
 
@@ -827,8 +857,25 @@ public class HavokBinarySerializer : HavokSerializer
                     HavokType.Member field = type.Fields[j];
                     int nameIndex = fieldStringIndices[field.Name];
                     writer.WriteHavokVarUInt((ulong)nameIndex);
-                    writer.WriteHavokVarUInt((ulong)field.Flags);
+                    
+                    ulong flagsValue = (ulong)field.Flags;
+                    
+                    // If the field has explicit alignment, set the alignment flag
+                    if (field.ExplicitAlignment.HasValue)
+                    {
+                        const ulong alignFlag = 0x80;
+                        flagsValue |= alignFlag;
+                    }
+                    
+                    writer.WriteHavokVarUInt(flagsValue);
                     writer.WriteHavokVarUInt((ulong)field.Offset);
+                    
+                    // Write explicit alignment if present
+                    if (field.ExplicitAlignment.HasValue)
+                    {
+                        writer.WriteHavokVarUInt(field.ExplicitAlignment.Value);
+                    }
+                    
                     int fieldTypeIndex = typeIndices[field.Type];
                     writer.WriteHavokVarUInt((ulong)fieldTypeIndex);
                 }

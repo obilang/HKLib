@@ -250,5 +250,10 @@ public class HavokType : Reflection.HavokType
         }
 
         public override HavokType Type => _type.Value;
+        
+        /// <summary>
+        /// Explicit alignment value for this member, if specified in the binary format
+        /// </summary>
+        public ulong? ExplicitAlignment { get; init; }
     }
 }
