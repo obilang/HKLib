@@ -11,6 +11,7 @@ public class HavokBinarySerializer : HavokSerializer
 {
     private HavokCompendium? _compendium;
 
+    // @obilang: always use a new instance of the TypeRegistry to prevent changes to the registry from affecting other instances of the serializer
     public HavokBinarySerializer() : this(HavokTypeRegistry.LoadDefault()) { }
 
     public HavokBinarySerializer(HavokTypeRegistry typeRegistry) : base(typeRegistry) { }
